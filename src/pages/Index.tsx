@@ -15,29 +15,54 @@ type Location = {
   id: string;
   name: string;
   animatronic: string | null;
+  camNumber: number;
 };
 
 type Animatronic = {
   name: string;
   behavior: 'aggressive' | 'sneaky' | 'random' | 'fast';
   speed: number;
-  icon: string;
+  image: string;
 };
 
 const ANIMATRONICS: Animatronic[] = [
-  { name: 'Freddy', behavior: 'sneaky', speed: 8000, icon: '🐻' },
-  { name: 'Bonnie', behavior: 'aggressive', speed: 5000, icon: '🐰' },
-  { name: 'Chica', behavior: 'random', speed: 7000, icon: '🐔' },
-  { name: 'Foxy', behavior: 'fast', speed: 4000, icon: '🦊' },
+  { 
+    name: 'Freddy', 
+    behavior: 'sneaky', 
+    speed: 8000, 
+    image: 'https://cdn.poehali.dev/projects/81c66a5c-3c60-4104-b60f-3b70b1f8c23d/files/0072ce98-3fdc-48a3-9daf-c9475d7276fa.jpg'
+  },
+  { 
+    name: 'Bonnie', 
+    behavior: 'aggressive', 
+    speed: 5000, 
+    image: 'https://cdn.poehali.dev/projects/81c66a5c-3c60-4104-b60f-3b70b1f8c23d/files/4bd8ac2f-b259-4b2e-9717-4f8b999f25e1.jpg'
+  },
+  { 
+    name: 'Chica', 
+    behavior: 'random', 
+    speed: 7000, 
+    image: 'https://cdn.poehali.dev/projects/81c66a5c-3c60-4104-b60f-3b70b1f8c23d/files/920e1551-2859-487c-8841-ad90a6e4dc99.jpg'
+  },
+  { 
+    name: 'Foxy', 
+    behavior: 'fast', 
+    speed: 4000, 
+    image: 'https://cdn.poehali.dev/projects/81c66a5c-3c60-4104-b60f-3b70b1f8c23d/files/e952d50b-c033-429e-84f7-77b616dc3351.jpg'
+  },
 ];
 
 const INITIAL_LOCATIONS: Location[] = [
-  { id: 'stage', name: 'Сцена', animatronic: null },
-  { id: 'dining', name: 'Столовая', animatronic: null },
-  { id: 'kitchen', name: 'Кухня', animatronic: null },
-  { id: 'corridor-left', name: 'Левый коридор', animatronic: null },
-  { id: 'corridor-right', name: 'Правый коридор', animatronic: null },
-  { id: 'storage', name: 'Подсобка', animatronic: null },
+  { id: 'show-stage', name: 'Show Stage', animatronic: null, camNumber: 1 },
+  { id: 'dining-area', name: 'Dining Area', animatronic: null, camNumber: 2 },
+  { id: 'backstage', name: 'Backstage', animatronic: null, camNumber: 3 },
+  { id: 'pirate-cove', name: "Pirate Cove", animatronic: null, camNumber: 4 },
+  { id: 'west-hall', name: 'West Hall', animatronic: null, camNumber: 5 },
+  { id: 'west-hall-corner', name: 'West Hall Corner', animatronic: null, camNumber: 6 },
+  { id: 'east-hall', name: 'East Hall', animatronic: null, camNumber: 7 },
+  { id: 'east-hall-corner', name: 'East Hall Corner', animatronic: null, camNumber: 8 },
+  { id: 'supply-closet', name: 'Supply Closet', animatronic: null, camNumber: 9 },
+  { id: 'kitchen', name: 'Kitchen', animatronic: null, camNumber: 10 },
 ];
 
 export default function Index() {
@@ -54,6 +79,7 @@ export default function Index() {
   const [flashlightOn, setFlashlightOn] = useState(false);
   
   const audioContextRef = useRef<AudioContext | null>(null);
+  const attackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const playSound = (frequency: number, duration: number, type: OscillatorType = 'sine') => {
     if (!audioContextRef.current) {
@@ -90,26 +116,29 @@ export default function Index() {
       if (gameOver || victory) return;
 
       ANIMATRONICS.forEach(animatronic => {
-        if (Math.random() > 0.6) {
+        if (Math.random() > 0.65) {
           setLocations(prev => {
             const newLocations = [...prev];
             const currentLocationIndex = newLocations.findIndex(loc => loc.animatronic === animatronic.name);
             
             if (currentLocationIndex === -1 && Math.random() > 0.5) {
-              newLocations[0].animatronic = animatronic.name;
+              const showStage = newLocations.find(l => l.id === 'show-stage');
+              if (showStage && !showStage.animatronic) {
+                showStage.animatronic = animatronic.name;
+              }
               return newLocations;
             }
 
             if (currentLocationIndex !== -1) {
               const currentLocation = newLocations[currentLocationIndex];
               
-              if (currentLocation.id === 'corridor-left') {
+              if (currentLocation.id === 'west-hall-corner') {
                 setLeftDoor(prev => {
                   if (!prev.hasAnimatronic) {
                     playSound(200, 0.3, 'sawtooth');
                     playSound(150, 0.5, 'square');
                     toast({
-                      title: `⚠️ ${animatronic.icon} ${animatronic.name}`,
+                      title: `⚠️ ${animatronic.name}`,
                       description: 'У ЛЕВОЙ ДВЕРИ!',
                       variant: 'destructive',
                     });
@@ -117,31 +146,32 @@ export default function Index() {
                   return { ...prev, hasAnimatronic: animatronic.name };
                 });
                 
-                setTimeout(() => {
+                if (attackTimeoutRef.current) clearTimeout(attackTimeoutRef.current);
+                attackTimeoutRef.current = setTimeout(() => {
                   setLeftDoor(current => {
                     if (current.isOpen && current.hasAnimatronic === animatronic.name) {
                       setGameOver(true);
                       playSound(100, 1, 'sawtooth');
                       toast({
-                        title: `💀 ${animatronic.icon} ${animatronic.name}`,
+                        title: `💀 ${animatronic.name} атаковал!`,
                         description: 'Jumpscare!',
                         variant: 'destructive',
                       });
                     }
                     return current;
                   });
-                }, 3000);
+                }, 5000);
                 
                 return newLocations;
               }
               
-              if (currentLocation.id === 'corridor-right') {
+              if (currentLocation.id === 'east-hall-corner') {
                 setRightDoor(prev => {
                   if (!prev.hasAnimatronic) {
                     playSound(200, 0.3, 'sawtooth');
                     playSound(150, 0.5, 'square');
                     toast({
-                      title: `⚠️ ${animatronic.icon} ${animatronic.name}`,
+                      title: `⚠️ ${animatronic.name}`,
                       description: 'У ПРАВОЙ ДВЕРИ!',
                       variant: 'destructive',
                     });
@@ -149,48 +179,64 @@ export default function Index() {
                   return { ...prev, hasAnimatronic: animatronic.name };
                 });
                 
-                setTimeout(() => {
+                if (attackTimeoutRef.current) clearTimeout(attackTimeoutRef.current);
+                attackTimeoutRef.current = setTimeout(() => {
                   setRightDoor(current => {
                     if (current.isOpen && current.hasAnimatronic === animatronic.name) {
                       setGameOver(true);
                       playSound(100, 1, 'sawtooth');
                       toast({
-                        title: `💀 ${animatronic.icon} ${animatronic.name}`,
+                        title: `💀 ${animatronic.name} атаковал!`,
                         description: 'Jumpscare!',
                         variant: 'destructive',
                       });
                     }
                     return current;
                   });
-                }, 3000);
+                }, 5000);
                 
                 return newLocations;
               }
               
               currentLocation.animatronic = null;
               
-              const availableLocations = newLocations.filter(loc => 
-                loc.id !== currentLocation.id && !loc.animatronic
-              );
+              const pathMap: Record<string, string[]> = {
+                'show-stage': ['dining-area', 'backstage'],
+                'dining-area': ['west-hall', 'east-hall'],
+                'backstage': ['west-hall'],
+                'pirate-cove': ['west-hall'],
+                'west-hall': ['supply-closet', 'west-hall-corner'],
+                'west-hall-corner': [],
+                'east-hall': ['east-hall-corner'],
+                'east-hall-corner': [],
+                'supply-closet': ['west-hall'],
+                'kitchen': ['east-hall'],
+              };
               
-              if (availableLocations.length > 0) {
+              const possibleMoves = pathMap[currentLocation.id] || [];
+              const availableMoves = possibleMoves
+                .map(id => newLocations.find(loc => loc.id === id))
+                .filter(loc => loc && !loc.animatronic) as Location[];
+              
+              if (availableMoves.length > 0) {
                 let nextLocation;
+                
                 if (animatronic.behavior === 'aggressive') {
-                  const corridors = availableLocations.filter(loc => 
-                    loc.id.includes('corridor')
+                  const doorMoves = availableMoves.filter(loc => 
+                    loc.id.includes('corner')
                   );
-                  nextLocation = corridors.length > 0 
-                    ? corridors[Math.floor(Math.random() * corridors.length)]
-                    : availableLocations[Math.floor(Math.random() * availableLocations.length)];
+                  nextLocation = doorMoves.length > 0 
+                    ? doorMoves[0]
+                    : availableMoves[Math.floor(Math.random() * availableMoves.length)];
                 } else if (animatronic.behavior === 'fast') {
-                  const corridors = availableLocations.filter(loc => 
-                    loc.id.includes('corridor')
+                  const doorMoves = availableMoves.filter(loc => 
+                    loc.id.includes('corner')
                   );
-                  nextLocation = corridors.length > 0 
-                    ? corridors[0]
-                    : availableLocations[Math.floor(Math.random() * availableLocations.length)];
+                  nextLocation = doorMoves.length > 0 
+                    ? doorMoves[0]
+                    : availableMoves[0];
                 } else {
-                  nextLocation = availableLocations[Math.floor(Math.random() * availableLocations.length)];
+                  nextLocation = availableMoves[Math.floor(Math.random() * availableMoves.length)];
                 }
                 
                 nextLocation.animatronic = animatronic.name;
@@ -202,20 +248,23 @@ export default function Index() {
           });
         }
       });
-    }, 4000);
+    }, 6000);
 
-    return () => clearInterval(moveAnimatronics);
+    return () => {
+      clearInterval(moveAnimatronics);
+      if (attackTimeoutRef.current) clearTimeout(attackTimeoutRef.current);
+    };
   }, [gameOver, victory]);
 
   useEffect(() => {
     const powerDrain = setInterval(() => {
       if (gameOver || victory) return;
       
-      let drain = 0.5;
-      if (!leftDoor.isOpen) drain += 1;
-      if (!rightDoor.isOpen) drain += 1;
-      if (cameraOpen) drain += 0.5;
-      if (flashlightOn) drain += 1;
+      let drain = 0.095;
+      if (!leftDoor.isOpen) drain += 0.095;
+      if (!rightDoor.isOpen) drain += 0.095;
+      if (cameraOpen) drain += 0.01;
+      if (flashlightOn) drain += 0.05;
       
       setPower(prev => {
         const newPower = prev - drain;
@@ -231,7 +280,7 @@ export default function Index() {
         }
         return newPower;
       });
-    }, 1000);
+    }, 100);
 
     return () => clearInterval(powerDrain);
   }, [gameOver, victory, leftDoor.isOpen, rightDoor.isOpen, cameraOpen, flashlightOn]);
@@ -248,7 +297,7 @@ export default function Index() {
           playSound(554, 0.5);
           setTimeout(() => playSound(659, 0.8), 200);
           toast({
-            title: '🎉 ВЫ ВЫЖИЛИ!',
+            title: '🎉 6 AM - ВЫ ВЫЖИЛИ!',
             description: 'Вы пережили ночь!',
           });
           return 6;
@@ -256,7 +305,7 @@ export default function Index() {
         playSound(300, 0.1);
         return newTime;
       });
-    }, 45000);
+    }, 90000);
 
     return () => clearInterval(timer);
   }, [gameOver, victory]);
@@ -274,11 +323,11 @@ export default function Index() {
             setLeftDoor(current => ({ ...current, hasAnimatronic: null }));
             setLocations(locs => {
               const newLocs = [...locs];
-              const corridorLeft = newLocs.find(l => l.id === 'corridor-left');
-              if (corridorLeft) corridorLeft.animatronic = null;
+              const corner = newLocs.find(l => l.id === 'west-hall-corner');
+              if (corner) corner.animatronic = null;
               return newLocs;
             });
-          }, 2000);
+          }, 3000);
         }
         return newState;
       });
@@ -290,11 +339,11 @@ export default function Index() {
             setRightDoor(current => ({ ...current, hasAnimatronic: null }));
             setLocations(locs => {
               const newLocs = [...locs];
-              const corridorRight = newLocs.find(l => l.id === 'corridor-right');
-              if (corridorRight) corridorRight.animatronic = null;
+              const corner = newLocs.find(l => l.id === 'east-hall-corner');
+              if (corner) corner.animatronic = null;
               return newLocs;
             });
-          }, 2000);
+          }, 3000);
         }
         return newState;
       });
@@ -319,6 +368,7 @@ export default function Index() {
     setCurrentCamera(0);
     setLocations(INITIAL_LOCATIONS);
     setFlashlightOn(false);
+    if (attackTimeoutRef.current) clearTimeout(attackTimeoutRef.current);
   };
 
   const renderOfficeView = () => {
@@ -330,14 +380,17 @@ export default function Index() {
         <div className="relative w-full h-full bg-[#000000] camera-static">
           <div className="absolute inset-0 flex items-center justify-center">
             {animatronicAtLocation ? (
-              <div className="text-center animate-pulse">
-                <div className="text-8xl mb-4">{animatronicAtLocation.icon}</div>
-                <p className="text-3xl font-bold text-[#8B0000] tracking-widest">
-                  {animatronicAtLocation.name}
-                </p>
-                <p className="text-lg text-[#8B0000] mt-2">
-                  В ЛОКАЦИИ: {currentLocation.name}
-                </p>
+              <div className="relative w-full h-full">
+                <img 
+                  src={animatronicAtLocation.image} 
+                  alt={animatronicAtLocation.name}
+                  className="w-full h-full object-cover opacity-80"
+                />
+                <div className="absolute bottom-4 left-4 right-4 bg-[#8B0000]/80 p-2 rounded">
+                  <p className="text-xl font-bold text-white text-center animate-pulse">
+                    ⚠️ {animatronicAtLocation.name} обнаружен!
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="text-center">
@@ -347,11 +400,11 @@ export default function Index() {
               </div>
             )}
           </div>
-          <div className="absolute top-2 left-2 text-[#2d5016] text-xs font-mono opacity-70">
-            REC ● CAM {currentCamera + 1}
+          <div className="absolute top-2 left-2 text-[#2d5016] text-xs font-mono opacity-70 bg-black/50 px-2 py-1 rounded">
+            REC ● CAM {currentLocation.camNumber}
           </div>
           <div className="absolute bottom-2 left-2 right-2">
-            <div className="flex gap-2 flex-wrap">
+            <div className="grid grid-cols-5 gap-1">
               {locations.map((loc, idx) => (
                 <Button
                   key={loc.id}
@@ -361,13 +414,13 @@ export default function Index() {
                     playSound(250, 0.1);
                     setCurrentCamera(idx);
                   }}
-                  className={`text-xs ${
+                  className={`text-xs px-1 py-1 h-auto ${
                     currentCamera === idx
                       ? 'bg-[#2d5016] text-white'
-                      : 'bg-[#0a0a0a] border-[#2d5016] text-[#2d5016]'
+                      : 'bg-[#0a0a0a]/80 border-[#2d5016] text-[#2d5016]'
                   } ${loc.animatronic ? 'border-[#8B0000] animate-pulse' : ''}`}
                 >
-                  {loc.name}
+                  CAM {loc.camNumber}
                   {loc.animatronic && ' 🔴'}
                 </Button>
               ))}
@@ -416,20 +469,27 @@ export default function Index() {
             {leftDoor.isOpen ? (
               <div className="relative w-full h-full bg-[#050505] flex items-center justify-center border-4 border-[#2d5016]">
                 {animatronic ? (
-                  <div className="text-center animate-pulse">
-                    <div className="text-9xl mb-6">{animatronic.icon}</div>
-                    <p className="text-5xl font-bold text-[#8B0000] tracking-widest animate-[glitch_0.3s_infinite]">
-                      ⚠️ {animatronic.name} ⚠️
-                    </p>
-                    <p className="text-2xl text-[#8B0000] mt-4">
-                      У ДВЕРИ! ЗАКРОЙ ДВЕРЬ!
-                    </p>
+                  <div className="relative w-full h-full">
+                    <img 
+                      src={animatronic.image} 
+                      alt={animatronic.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <div className="absolute bottom-10 left-0 right-0 text-center">
+                      <p className="text-5xl font-bold text-[#8B0000] tracking-widest animate-[glitch_0.3s_infinite] drop-shadow-[0_0_20px_rgba(139,0,0,1)]">
+                        ⚠️ {animatronic.name} ⚠️
+                      </p>
+                      <p className="text-2xl text-[#8B0000] mt-4 font-bold animate-pulse">
+                        ЗАКРОЙ ДВЕРЬ СЕЙЧАС!
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center">
                     <Icon name="DoorOpen" size={100} className="text-[#2d5016] opacity-30 mb-4 mx-auto" />
                     <p className="text-xl text-[#2d5016] opacity-50">
-                      Коридор пуст
+                      West Hall пуст
                     </p>
                   </div>
                 )}
@@ -457,20 +517,27 @@ export default function Index() {
             {rightDoor.isOpen ? (
               <div className="relative w-full h-full bg-[#050505] flex items-center justify-center border-4 border-[#2d5016]">
                 {animatronic ? (
-                  <div className="text-center animate-pulse">
-                    <div className="text-9xl mb-6">{animatronic.icon}</div>
-                    <p className="text-5xl font-bold text-[#8B0000] tracking-widest animate-[glitch_0.3s_infinite]">
-                      ⚠️ {animatronic.name} ⚠️
-                    </p>
-                    <p className="text-2xl text-[#8B0000] mt-4">
-                      У ДВЕРИ! ЗАКРОЙ ДВЕРЬ!
-                    </p>
+                  <div className="relative w-full h-full">
+                    <img 
+                      src={animatronic.image} 
+                      alt={animatronic.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <div className="absolute bottom-10 left-0 right-0 text-center">
+                      <p className="text-5xl font-bold text-[#8B0000] tracking-widest animate-[glitch_0.3s_infinite] drop-shadow-[0_0_20px_rgba(139,0,0,1)]">
+                        ⚠️ {animatronic.name} ⚠️
+                      </p>
+                      <p className="text-2xl text-[#8B0000] mt-4 font-bold animate-pulse">
+                        ЗАКРОЙ ДВЕРЬ СЕЙЧАС!
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center">
                     <Icon name="DoorOpen" size={100} className="text-[#2d5016] opacity-30 mb-4 mx-auto" />
                     <p className="text-xl text-[#2d5016] opacity-50">
-                      Коридор пуст
+                      East Hall пуст
                     </p>
                   </div>
                 )}
@@ -494,13 +561,16 @@ export default function Index() {
     <div className="min-h-screen bg-[#0a0a0a] text-[#2d5016] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-radial from-[#1a1a1a] via-[#0a0a0a] to-black opacity-50"></div>
       
-      <div className="absolute top-0 left-0 right-0 bg-[#0a0a0a] border-b-2 border-[#2d5016] p-4 flex justify-between items-center z-10">
+      <div className="absolute top-0 left-0 right-0 bg-[#0a0a0a] border-b-2 border-[#2d5016] p-4 flex justify-between items-center z-10 flex-wrap gap-2">
         <div className="flex gap-6 items-center flex-wrap">
           <div className="text-sm">
             <span className="text-[#8B0000] font-bold">НОЧЬ:</span> <span className="text-[#2d5016]">{time} AM</span>
           </div>
           <div className="text-sm">
-            <span className="text-[#8B0000] font-bold">ЭНЕРГИЯ:</span> <span className={power < 30 ? 'text-[#8B0000] animate-pulse' : 'text-[#2d5016]'}>{Math.round(power)}%</span>
+            <span className="text-[#8B0000] font-bold">ЭНЕРГИЯ:</span> 
+            <span className={power < 20 ? 'text-[#8B0000] animate-pulse font-bold' : power < 50 ? 'text-yellow-500' : 'text-[#2d5016]'}>
+              {' '}{Math.round(power)}%
+            </span>
           </div>
           <div className="flex gap-2">
             <div className={`text-xs px-2 py-1 rounded ${!leftDoor.isOpen ? 'bg-[#8B0000] text-white' : leftDoor.hasAnimatronic ? 'bg-[#8B0000] text-white animate-pulse' : 'bg-[#1a1a1a] text-[#2d5016]'}`}>
@@ -512,7 +582,7 @@ export default function Index() {
           </div>
         </div>
         <h1 className="text-2xl md:text-4xl text-[#8B0000] drop-shadow-[0_0_10px_rgba(139,0,0,0.8)] tracking-wider">
-          SECURITY OFFICE
+          FIVE NIGHTS AT FREDDY'S
         </h1>
       </div>
 
@@ -625,11 +695,11 @@ export default function Index() {
           <div className="absolute inset-0 bg-black/95 flex items-center justify-center backdrop-blur-sm">
             <Card className="bg-[#0a0a0a] border-4 border-[#8B0000] p-8 text-center max-w-md">
               <h2 className="text-5xl mb-4 text-[#8B0000] tracking-widest drop-shadow-[0_0_15px_rgba(139,0,0,1)]">
-                {victory ? '🎉 ПОБЕДА!' : '💀 GAME OVER'}
+                {victory ? '🎉 6 AM!' : '💀 GAME OVER'}
               </h2>
               <p className="text-xl text-[#2d5016] mb-6">
                 {victory 
-                  ? 'Вы пережили ночь в охранной!' 
+                  ? 'Вы пережили ночь в Freddy Fazbear Pizza!' 
                   : 'Аниматроники вас поймали...'}
               </p>
               <Button
@@ -645,9 +715,9 @@ export default function Index() {
         )}
       </div>
 
-      <div className="absolute bottom-4 text-center text-[#2d5016] opacity-50 text-xs z-10 max-w-4xl">
-        <p>🐻 Freddy - хитрый | 🐰 Bonnie - агрессивный | 🐔 Chica - случайный | 🦊 Foxy - быстрый</p>
-        <p className="mt-1">Следи за камерами • Закрывай двери когда видишь аниматроников • Используй фонарик</p>
+      <div className="absolute bottom-4 text-center text-[#2d5016] opacity-50 text-xs z-10 max-w-4xl px-4">
+        <p>Следи за аниматрониками через 10 камер • Закрывай двери когда они у окна • Береги энергию</p>
+        <p className="mt-1">Freddy (хитрый) • Bonnie (агрессивный) • Chica (непредсказуемая) • Foxy (быстрый)</p>
       </div>
     </div>
   );
