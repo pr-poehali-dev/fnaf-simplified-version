@@ -1,38 +1,40 @@
+@import url("https://fonts.googleapis.com/css2?family=Creepster&family=Roboto+Mono:wght@400;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 0 0% 4%;
+    --foreground: 120 20% 70%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 6%;
+    --card-foreground: 120 20% 70%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 120 20% 70%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 100% 27%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 120 20% 70%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 120 10% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 120 30% 15%;
+    --accent-foreground: 120 30% 80%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 100% 40%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 0 0% 20%;
+    --input: 0 0% 15%;
+    --ring: 0 100% 27%;
 
-    --radius: 0.5rem;
+    --radius: 0.3rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -97,5 +99,64 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: "Roboto Mono", monospace;
   }
+
+  h1,
+  h2,
+  h3 {
+    font-family: "Creepster", cursive;
+  }
+}
+
+@keyframes glitch {
+  0%,
+  100% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+  }
+  60% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.camera-static {
+  position: relative;
+  overflow: hidden;
+}
+
+.camera-static::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15) 0px,
+    transparent 1px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 3px
+  );
+  pointer-events: none;
+  animation: flicker 0.15s infinite;
 }
