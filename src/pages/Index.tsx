@@ -4,70 +4,99 @@ import { Card } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import { toast } from '@/components/ui/use-toast';
 
-type Location = {
-  id: string;
-  name: string;
+type ViewDirection = 'center' | 'left' | 'right';
+
+type DoorState = {
+  isOpen: boolean;
   hasAnimatronic: boolean;
 };
-
-const LOCATIONS: Location[] = [
-  { id: 'corridor', name: 'Коридор', hasAnimatronic: false },
-  { id: 'ventilation', name: 'Вентиляция', hasAnimatronic: false },
-  { id: 'kitchen', name: 'Кухня', hasAnimatronic: false },
-  { id: 'stage', name: 'Сцена', hasAnimatronic: false },
-  { id: 'dining', name: 'Столовая', hasAnimatronic: false },
-  { id: 'storage', name: 'Подсобка', hasAnimatronic: false },
-];
 
 const ANIMATRONIC_NAMES = ['Freddy', 'Bonnie', 'Chica', 'Foxy'];
 
 export default function Index() {
-  const [currentCamera, setCurrentCamera] = useState(0);
-  const [locations, setLocations] = useState<Location[]>(LOCATIONS);
+  const [viewDirection, setViewDirection] = useState<ViewDirection>('center');
+  const [leftDoor, setLeftDoor] = useState<DoorState>({ isOpen: true, hasAnimatronic: false });
+  const [rightDoor, setRightDoor] = useState<DoorState>({ isOpen: true, hasAnimatronic: false });
   const [power, setPower] = useState(100);
   const [time, setTime] = useState(0);
   const [gameOver, setGameOver] = useState(false);
-  const [isWarning, setIsWarning] = useState(false);
+  const [victory, setVictory] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   useEffect(() => {
     const moveAnimatronics = setInterval(() => {
-      if (gameOver) return;
+      if (gameOver || victory) return;
 
-      setLocations(prev => {
-        const newLocations = [...prev];
-        const randomIndex = Math.floor(Math.random() * newLocations.length);
-        const shouldMove = Math.random() > 0.6;
+      const shouldMoveLeft = Math.random() > 0.7;
+      const shouldMoveRight = Math.random() > 0.7;
 
-        if (shouldMove) {
-          newLocations[randomIndex].hasAnimatronic = !newLocations[randomIndex].hasAnimatronic;
-
-          if (newLocations[randomIndex].hasAnimatronic) {
+      if (shouldMoveLeft) {
+        setLeftDoor(prev => {
+          const newHasAnimatronic = !prev.hasAnimatronic;
+          if (newHasAnimatronic) {
             const animatronicName = ANIMATRONIC_NAMES[Math.floor(Math.random() * ANIMATRONIC_NAMES.length)];
-            
-            setIsWarning(true);
-            setTimeout(() => setIsWarning(false), 500);
-
             toast({
-              title: '⚠️ ДВИЖЕНИЕ ОБНАРУЖЕНО',
-              description: `${animatronicName} в локации: ${newLocations[randomIndex].name}`,
+              title: '⚠️ ЛЕВАЯ ДВЕРЬ',
+              description: `${animatronicName} приближается слева!`,
               variant: 'destructive',
             });
+            
+            if (prev.isOpen) {
+              setTimeout(() => {
+                setGameOver(true);
+                toast({
+                  title: '💀 GAME OVER',
+                  description: 'Аниматроник проник через открытую дверь!',
+                  variant: 'destructive',
+                });
+              }, 3000);
+            }
           }
-        }
+          return { ...prev, hasAnimatronic: newHasAnimatronic };
+        });
+      }
 
-        return newLocations;
-      });
-    }, 5000);
+      if (shouldMoveRight) {
+        setRightDoor(prev => {
+          const newHasAnimatronic = !prev.hasAnimatronic;
+          if (newHasAnimatronic) {
+            const animatronicName = ANIMATRONIC_NAMES[Math.floor(Math.random() * ANIMATRONIC_NAMES.length)];
+            toast({
+              title: '⚠️ ПРАВАЯ ДВЕРЬ',
+              description: `${animatronicName} приближается справа!`,
+              variant: 'destructive',
+            });
+            
+            if (prev.isOpen) {
+              setTimeout(() => {
+                setGameOver(true);
+                toast({
+                  title: '💀 GAME OVER',
+                  description: 'Аниматроник проник через открытую дверь!',
+                  variant: 'destructive',
+                });
+              }, 3000);
+            }
+          }
+          return { ...prev, hasAnimatronic: newHasAnimatronic };
+        });
+      }
+    }, 6000);
 
     return () => clearInterval(moveAnimatronics);
-  }, [gameOver]);
+  }, [gameOver, victory]);
 
   useEffect(() => {
     const powerDrain = setInterval(() => {
-      if (gameOver) return;
+      if (gameOver || victory) return;
+      
+      let drain = 1;
+      if (!leftDoor.isOpen) drain += 2;
+      if (!rightDoor.isOpen) drain += 2;
+      if (cameraOpen) drain += 1;
       
       setPower(prev => {
-        const newPower = prev - 1;
+        const newPower = prev - drain;
         if (newPower <= 0) {
           setGameOver(true);
           toast({
@@ -82,15 +111,15 @@ export default function Index() {
     }, 2000);
 
     return () => clearInterval(powerDrain);
-  }, [gameOver]);
+  }, [gameOver, victory, leftDoor.isOpen, rightDoor.isOpen, cameraOpen]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (gameOver) return;
+      if (gameOver || victory) return;
       
       setTime(prev => {
         if (prev >= 6) {
-          setGameOver(true);
+          setVictory(true);
           toast({
             title: '🎉 ВЫ ВЫЖИЛИ!',
             description: 'Вы пережили ночь!',
@@ -102,26 +131,148 @@ export default function Index() {
     }, 30000);
 
     return () => clearInterval(timer);
-  }, [gameOver]);
+  }, [gameOver, victory]);
 
-  const handleCameraSwitch = (direction: 'left' | 'right') => {
-    if (gameOver) return;
+  const toggleDoor = (side: 'left' | 'right') => {
+    if (gameOver || victory) return;
     
-    setPower(prev => Math.max(0, prev - 2));
-    
-    if (direction === 'left') {
-      setCurrentCamera(prev => (prev === 0 ? locations.length - 1 : prev - 1));
+    if (side === 'left') {
+      setLeftDoor(prev => ({ ...prev, isOpen: !prev.isOpen }));
     } else {
-      setCurrentCamera(prev => (prev === locations.length - 1 ? 0 : prev + 1));
+      setRightDoor(prev => ({ ...prev, isOpen: !prev.isOpen }));
     }
   };
 
   const resetGame = () => {
-    setCurrentCamera(0);
-    setLocations(LOCATIONS);
+    setViewDirection('center');
+    setLeftDoor({ isOpen: true, hasAnimatronic: false });
+    setRightDoor({ isOpen: true, hasAnimatronic: false });
     setPower(100);
     setTime(0);
     setGameOver(false);
+    setVictory(false);
+    setCameraOpen(false);
+  };
+
+  const renderOfficeView = () => {
+    if (cameraOpen) {
+      return (
+        <div className="relative w-full h-full bg-[#000000] camera-static">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <Icon name="Cctv" size={80} className="text-[#2d5016] opacity-50 mb-4 mx-auto" />
+              <p className="text-xl text-[#2d5016] opacity-70">СИСТЕМА КАМЕР</p>
+              <p className="text-sm text-[#2d5016] opacity-50 mt-2">Мониторинг локаций</p>
+            </div>
+          </div>
+          <div className="absolute top-2 left-2 text-[#2d5016] text-xs font-mono opacity-70">
+            REC ●
+          </div>
+        </div>
+      );
+    }
+
+    if (viewDirection === 'center') {
+      return (
+        <div className="relative w-full h-full bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] flex items-center justify-center">
+          <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[#2d2d2d] to-transparent"></div>
+          
+          <div className="absolute bottom-20 w-full flex justify-center gap-12">
+            <div className="bg-[#1a1a1a] border-2 border-[#2d5016] p-4 rounded-lg">
+              <Icon name="Monitor" size={60} className="text-[#2d5016] mb-2" />
+              <p className="text-xs text-[#2d5016] text-center">МОНИТОР</p>
+            </div>
+            <div className="bg-[#1a1a1a] border-2 border-[#2d5016] p-4 rounded-lg">
+              <Icon name="Coffee" size={60} className="text-[#2d5016] mb-2" />
+              <p className="text-xs text-[#2d5016] text-center">КОФЕ</p>
+            </div>
+            <div className="bg-[#1a1a1a] border-2 border-[#2d5016] p-4 rounded-lg">
+              <Icon name="Lightbulb" size={60} className="text-[#2d5016] mb-2" />
+              <p className="text-xs text-[#2d5016] text-center">ЛАМПА</p>
+            </div>
+          </div>
+          
+          <div className="absolute top-1/2 left-10 transform -translate-y-1/2 text-[#2d5016] opacity-50 text-xs">
+            ← ЛЕВАЯ ДВЕРЬ
+          </div>
+          <div className="absolute top-1/2 right-10 transform -translate-y-1/2 text-[#2d5016] opacity-50 text-xs">
+            ПРАВАЯ ДВЕРЬ →
+          </div>
+        </div>
+      );
+    }
+
+    if (viewDirection === 'left') {
+      return (
+        <div className="relative w-full h-full bg-gradient-to-r from-[#0a0a0a] to-[#1a1a1a]">
+          <div className="absolute inset-0 border-8 border-[#2d2d2d] flex items-center justify-center">
+            {leftDoor.isOpen ? (
+              <div className="relative w-full h-full bg-[#050505] flex items-center justify-center border-4 border-[#2d5016]">
+                {leftDoor.hasAnimatronic ? (
+                  <div className="text-center animate-pulse">
+                    <Icon name="Skull" size={150} className="text-[#8B0000] mb-4 mx-auto drop-shadow-[0_0_30px_rgba(139,0,0,1)]" />
+                    <p className="text-5xl font-bold text-[#8B0000] tracking-widest animate-[glitch_0.3s_infinite]">
+                      ⚠️ ОПАСНОСТЬ ⚠️
+                    </p>
+                    <p className="text-2xl text-[#8B0000] mt-4">
+                      АНИМАТРОНИК У ДВЕРИ!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Icon name="DoorOpen" size={100} className="text-[#2d5016] opacity-30 mb-4 mx-auto" />
+                    <p className="text-xl text-[#2d5016] opacity-50">
+                      Коридор пуст
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center border-4 border-[#8B0000]">
+                <Icon name="DoorClosed" size={120} className="text-[#8B0000]" />
+                <p className="absolute bottom-10 text-2xl text-[#8B0000] font-bold">ДВЕРЬ ЗАКРЫТА</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (viewDirection === 'right') {
+      return (
+        <div className="relative w-full h-full bg-gradient-to-l from-[#0a0a0a] to-[#1a1a1a]">
+          <div className="absolute inset-0 border-8 border-[#2d2d2d] flex items-center justify-center">
+            {rightDoor.isOpen ? (
+              <div className="relative w-full h-full bg-[#050505] flex items-center justify-center border-4 border-[#2d5016]">
+                {rightDoor.hasAnimatronic ? (
+                  <div className="text-center animate-pulse">
+                    <Icon name="Skull" size={150} className="text-[#8B0000] mb-4 mx-auto drop-shadow-[0_0_30px_rgba(139,0,0,1)]" />
+                    <p className="text-5xl font-bold text-[#8B0000] tracking-widest animate-[glitch_0.3s_infinite]">
+                      ⚠️ ОПАСНОСТЬ ⚠️
+                    </p>
+                    <p className="text-2xl text-[#8B0000] mt-4">
+                      АНИМАТРОНИК У ДВЕРИ!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Icon name="DoorOpen" size={100} className="text-[#2d5016] opacity-30 mb-4 mx-auto" />
+                    <p className="text-xl text-[#2d5016] opacity-50">
+                      Коридор пуст
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center border-4 border-[#8B0000]">
+                <Icon name="DoorClosed" size={120} className="text-[#8B0000]" />
+                <p className="absolute bottom-10 text-2xl text-[#8B0000] font-bold">ДВЕРЬ ЗАКРЫТА</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
   };
 
   return (
@@ -136,112 +287,108 @@ export default function Index() {
           <div className="text-sm">
             <span className="text-[#8B0000] font-bold">ЭНЕРГИЯ:</span> <span className={power < 30 ? 'text-[#8B0000] animate-pulse' : 'text-[#2d5016]'}>{power}%</span>
           </div>
+          <div className="flex gap-2">
+            <div className={`text-xs px-2 py-1 rounded ${!leftDoor.isOpen ? 'bg-[#8B0000] text-white' : 'bg-[#1a1a1a] text-[#2d5016]'}`}>
+              ← {leftDoor.isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
+            </div>
+            <div className={`text-xs px-2 py-1 rounded ${!rightDoor.isOpen ? 'bg-[#8B0000] text-white' : 'bg-[#1a1a1a] text-[#2d5016]'}`}>
+              {rightDoor.isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'} →
+            </div>
+          </div>
         </div>
         <h1 className="text-2xl md:text-4xl text-[#8B0000] drop-shadow-[0_0_10px_rgba(139,0,0,0.8)] tracking-wider">
-          FIVE NIGHTS AT FREDDY'S
+          SECURITY OFFICE
         </h1>
       </div>
 
       <div className="relative z-10 w-full max-w-6xl mt-20">
-        <Card className={`bg-[#0a0a0a] border-2 ${isWarning ? 'border-[#8B0000]' : 'border-[#2d5016]'} p-6 camera-static transition-all`}>
-          <div className="flex items-center justify-between mb-4">
+        <Card className="bg-[#0a0a0a] border-2 border-[#2d5016] p-6">
+          <div className="relative aspect-video bg-[#000000] rounded-md overflow-hidden">
+            {renderOfficeView()}
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
             <Button
               variant="outline"
               size="lg"
-              onClick={() => handleCameraSwitch('left')}
-              disabled={gameOver}
-              className="bg-[#1a1a1a] border-[#2d5016] text-[#2d5016] hover:bg-[#2d5016] hover:text-white"
+              onClick={() => setViewDirection('left')}
+              disabled={gameOver || victory}
+              className={`${viewDirection === 'left' ? 'bg-[#2d5016] text-white' : 'bg-[#1a1a1a] text-[#2d5016]'} border-[#2d5016] hover:bg-[#2d5016] hover:text-white`}
             >
-              <Icon name="ChevronLeft" size={24} />
+              <Icon name="ArrowLeft" size={24} className="mr-2" />
+              Левая дверь
             </Button>
-
-            <div className="flex-1 text-center">
-              <h2 className="text-3xl mb-2 text-[#8B0000] tracking-wider drop-shadow-[0_0_8px_rgba(139,0,0,0.6)]">
-                CAM {currentCamera + 1}: {locations[currentCamera].name}
-              </h2>
-              <p className="text-xs text-[#2d5016] opacity-70 font-mono">
-                {new Date().toLocaleTimeString()}
-              </p>
-            </div>
 
             <Button
               variant="outline"
               size="lg"
-              onClick={() => handleCameraSwitch('right')}
-              disabled={gameOver}
-              className="bg-[#1a1a1a] border-[#2d5016] text-[#2d5016] hover:bg-[#2d5016] hover:text-white"
+              onClick={() => setViewDirection('center')}
+              disabled={gameOver || victory}
+              className={`${viewDirection === 'center' ? 'bg-[#2d5016] text-white' : 'bg-[#1a1a1a] text-[#2d5016]'} border-[#2d5016] hover:bg-[#2d5016] hover:text-white`}
             >
-              <Icon name="ChevronRight" size={24} />
+              <Icon name="Home" size={24} className="mr-2" />
+              Центр
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setViewDirection('right')}
+              disabled={gameOver || victory}
+              className={`${viewDirection === 'right' ? 'bg-[#2d5016] text-white' : 'bg-[#1a1a1a] text-[#2d5016]'} border-[#2d5016] hover:bg-[#2d5016] hover:text-white`}
+            >
+              Правая дверь
+              <Icon name="ArrowRight" size={24} className="ml-2" />
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setCameraOpen(!cameraOpen)}
+              disabled={gameOver || victory}
+              className={`${cameraOpen ? 'bg-[#2d5016] text-white' : 'bg-[#1a1a1a] text-[#2d5016]'} border-[#2d5016] hover:bg-[#2d5016] hover:text-white`}
+            >
+              <Icon name="Cctv" size={24} className="mr-2" />
+              Камеры
             </Button>
           </div>
 
-          <div className="relative aspect-video bg-[#000000] border-2 border-[#2d5016] rounded-md overflow-hidden">
-            <div className="absolute inset-0 flex items-center justify-center">
-              {locations[currentCamera].hasAnimatronic ? (
-                <div className="text-center animate-pulse">
-                  <Icon name="Skull" size={120} className="text-[#8B0000] mb-4 mx-auto drop-shadow-[0_0_20px_rgba(139,0,0,0.8)]" />
-                  <p className="text-4xl font-bold text-[#8B0000] tracking-widest animate-[glitch_0.3s_infinite]">
-                    ⚠️ ВНИМАНИЕ ⚠️
-                  </p>
-                  <p className="text-xl text-[#8B0000] mt-2">
-                    АНИМАТРОНИК ОБНАРУЖЕН
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <Icon name="Video" size={80} className="text-[#2d5016] opacity-50 mb-4 mx-auto" />
-                  <p className="text-xl text-[#2d5016] opacity-70">
-                    Локация чиста
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            <div className="absolute top-2 left-2 text-[#2d5016] text-xs font-mono opacity-70">
-              REC ●
-            </div>
-          </div>
+          {viewDirection === 'left' && (
+            <Button
+              variant={leftDoor.isOpen ? 'destructive' : 'default'}
+              size="lg"
+              onClick={() => toggleDoor('left')}
+              disabled={gameOver || victory}
+              className="w-full mt-4"
+            >
+              <Icon name={leftDoor.isOpen ? 'DoorOpen' : 'DoorClosed'} size={24} className="mr-2" />
+              {leftDoor.isOpen ? 'ЗАКРЫТЬ ЛЕВУЮ ДВЕРЬ' : 'ОТКРЫТЬ ЛЕВУЮ ДВЕРЬ'}
+            </Button>
+          )}
 
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-6">
-            {locations.map((location, index) => (
-              <Button
-                key={location.id}
-                variant={currentCamera === index ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  if (!gameOver) {
-                    setCurrentCamera(index);
-                    setPower(prev => Math.max(0, prev - 1));
-                  }
-                }}
-                disabled={gameOver}
-                className={`relative ${
-                  currentCamera === index
-                    ? 'bg-[#2d5016] text-white border-[#2d5016]'
-                    : 'bg-[#0a0a0a] border-[#2d5016] text-[#2d5016] hover:bg-[#1a1a1a]'
-                }`}
-              >
-                {location.name}
-                {location.hasAnimatronic && (
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#8B0000] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-[#8B0000]"></span>
-                  </span>
-                )}
-              </Button>
-            ))}
-          </div>
+          {viewDirection === 'right' && (
+            <Button
+              variant={rightDoor.isOpen ? 'destructive' : 'default'}
+              size="lg"
+              onClick={() => toggleDoor('right')}
+              disabled={gameOver || victory}
+              className="w-full mt-4"
+            >
+              <Icon name={rightDoor.isOpen ? 'DoorOpen' : 'DoorClosed'} size={24} className="mr-2" />
+              {rightDoor.isOpen ? 'ЗАКРЫТЬ ПРАВУЮ ДВЕРЬ' : 'ОТКРЫТЬ ПРАВУЮ ДВЕРЬ'}
+            </Button>
+          )}
         </Card>
 
-        {gameOver && (
-          <div className="absolute inset-0 bg-black/90 flex items-center justify-center backdrop-blur-sm">
+        {(gameOver || victory) && (
+          <div className="absolute inset-0 bg-black/95 flex items-center justify-center backdrop-blur-sm">
             <Card className="bg-[#0a0a0a] border-4 border-[#8B0000] p-8 text-center max-w-md">
               <h2 className="text-5xl mb-4 text-[#8B0000] tracking-widest drop-shadow-[0_0_15px_rgba(139,0,0,1)]">
-                {time >= 6 ? '🎉 ПОБЕДА!' : '💀 GAME OVER'}
+                {victory ? '🎉 ПОБЕДА!' : '💀 GAME OVER'}
               </h2>
               <p className="text-xl text-[#2d5016] mb-6">
-                {time >= 6 
-                  ? 'Вы пережили ночь в пиццерии Freddy Fazbear!' 
+                {victory 
+                  ? 'Вы пережили ночь в охранной!' 
                   : 'Аниматроники вас поймали...'}
               </p>
               <Button
@@ -258,7 +405,7 @@ export default function Index() {
       </div>
 
       <div className="absolute bottom-4 text-center text-[#2d5016] opacity-50 text-xs z-10">
-        <p>Используйте стрелки для переключения камер | Следите за энергией</p>
+        <p>Поворачивайтесь и закрывайте двери когда видите аниматроников | Следите за энергией</p>
       </div>
     </div>
   );
